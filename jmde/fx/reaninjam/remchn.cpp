@@ -85,6 +85,7 @@ static WDL_DLGRET RemoteUserItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPA
 
         ShowWindow(GetDlgItem(hwndDlg,IDC_DIV),m_user ? SW_SHOW : SW_HIDE);
         SendDlgItemMessage(hwndDlg,IDC_MUTE,BM_SETIMAGE,IMAGE_ICON|0x8000,(LPARAM)GetIconThemePointer(mute?"track_mute_on":"track_mute_off"));
+        SendDlgItemMessage(hwndDlg,IDC_MUTE,WM_USER+0x300,0xbeef,(LPARAM)(mute?"Unmute remote user":"Mute remote user"));
       }
     break;
     case WM_LCUSER_VUUPDATE:
@@ -127,6 +128,7 @@ static WDL_DLGRET RemoteUserItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPA
             g_client->SetUserState(m_user,false,0.0,false,0.0,true,mute);
             g_client->m_remotechannel_rd_mutex.Leave();
             SendDlgItemMessage(hwndDlg,IDC_MUTE,BM_SETIMAGE,IMAGE_ICON|0x8000,(LPARAM)GetIconThemePointer(mute?"track_mute_on":"track_mute_off"));
+            SendDlgItemMessage(hwndDlg,IDC_MUTE,WM_USER+0x300,0xbeef,(LPARAM)(mute?"Unmute remote user":"Mute remote user"));
           }
         break;
       }
@@ -140,6 +142,16 @@ static WDL_DLGRET RemoteChannelItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, 
   int m_userch=GetWindowLongPtr(hwndDlg,GWLP_USERDATA); // high 16 bits, user, low 16 bits, channel
   switch (uMsg)
   {
+    case WM_NOTIFY:
+#ifdef _WIN32
+      {
+        extern LRESULT (*handleCheckboxCustomDraw)(HWND, LPARAM, const unsigned short *list, int listsz, bool isdlg);
+        const unsigned short list[] = { IDC_RECV };
+        if (handleCheckboxCustomDraw) 
+          return handleCheckboxCustomDraw(hwndDlg,lParam,list,1,true);
+      }
+#endif
+    break;
     case WM_CTLCOLOREDIT:
     case WM_CTLCOLORLISTBOX:
     case WM_CTLCOLORBTN:
@@ -156,14 +168,8 @@ static WDL_DLGRET RemoteChannelItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, 
       SendDlgItemMessage(hwndDlg,IDC_VOL,TBM_SETTIC,FALSE,-1);       
       SendDlgItemMessage(hwndDlg,IDC_PAN,TBM_SETRANGE,FALSE,MAKELONG(0,100));
       SendDlgItemMessage(hwndDlg,IDC_PAN,TBM_SETTIC,FALSE,50);       
-      {
-        extern void (*RemoveXPStyle)(HWND hwnd, int rem);
-        if (RemoveXPStyle)
-        {
-          RemoveXPStyle(GetDlgItem(hwndDlg,IDC_RECV),1);
-        }
-      }
-
+      SendDlgItemMessage(hwndDlg,IDC_VOL,WM_USER+9999,1,(LPARAM)"Remote channel volume");
+      SendDlgItemMessage(hwndDlg,IDC_PAN,WM_USER+9999,1,(LPARAM)"Remote channel pan");
     return 0;
     case WM_RCUSER_UPDATE:
       m_userch=((int)LOWORD(wParam) << 16) | LOWORD(lParam);
@@ -202,7 +208,9 @@ static WDL_DLGRET RemoteChannelItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, 
 
         CheckDlgButton(hwndDlg,IDC_RECV,sub?BST_CHECKED:0);
         SendDlgItemMessage(hwndDlg,IDC_MUTE,BM_SETIMAGE,IMAGE_ICON|0x8000,(LPARAM)GetIconThemePointer(m?"track_mute_on":"track_mute_off"));
+        SendDlgItemMessage(hwndDlg,IDC_MUTE,WM_USER+0x300,0xbeef,(LPARAM)(m?"Unmute remote channel":"Mute remote channel"));
         SendDlgItemMessage(hwndDlg,IDC_SOLO,BM_SETIMAGE,IMAGE_ICON|0x8000,(LPARAM)GetIconThemePointer(s?"track_solo_on":"track_solo_off"));
+        SendDlgItemMessage(hwndDlg,IDC_SOLO,WM_USER+0x300,0xbeef,(LPARAM)(s?"Unsolo remote channel":"Solo remote channel"));
         
         SendDlgItemMessage(hwndDlg,IDC_VOL,TBM_SETPOS,TRUE,(LPARAM)DB2SLIDER(VAL2DB(v)));
 
@@ -275,6 +283,7 @@ static WDL_DLGRET RemoteChannelItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, 
             g_client->SetUserChannelState(user,chan,false,false,false,0.0,false,0.0,false,false,true,s);
             g_client->m_remotechannel_rd_mutex.Leave();
             SendDlgItemMessage(hwndDlg,IDC_SOLO,BM_SETIMAGE,IMAGE_ICON|0x8000,(LPARAM)GetIconThemePointer(s?"track_solo_on":"track_solo_off"));
+            SendDlgItemMessage(hwndDlg,IDC_SOLO,WM_USER+0x300,0xbeef,(LPARAM)(s?"Unsolo remote channel":"Solo remote channel"));
           }
         break;
         case IDC_MUTE:
@@ -288,6 +297,7 @@ static WDL_DLGRET RemoteChannelItemProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, 
             g_client->SetUserChannelState(user,chan,false,false,false,0.0,false,0.0,true,m,false,false);
             g_client->m_remotechannel_rd_mutex.Leave();
             SendDlgItemMessage(hwndDlg,IDC_MUTE,BM_SETIMAGE,IMAGE_ICON|0x8000,(LPARAM)GetIconThemePointer(m?"track_mute_on":"track_mute_off"));
+            SendDlgItemMessage(hwndDlg,IDC_MUTE,WM_USER+0x300,0xbeef,(LPARAM)(m?"Unmute remote channel":"Mute remote channel"));
           }
         break;
         case IDC_VOLLBL:
@@ -462,12 +472,12 @@ static WDL_DLGRET RemoteChannelListProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, 
 }
 
 
+HWND g_remote_channel_wnd;
 
 WDL_DLGRET RemoteOuterChannelListProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
   static int m_wh, m_ww,m_nScrollPos,m_nScrollPos_w;
   static int m_h, m_maxpos_h, m_w,m_maxpos_w; 
-  static HWND m_child;
   switch (uMsg)
   {
 
@@ -492,16 +502,16 @@ WDL_DLGRET RemoteOuterChannelListProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LP
         if (uMsg == WM_INITDIALOG)
         {
           InitializeCoolSB(hwndDlg);
-          m_child=CreateDialog(g_hInst,MAKEINTRESOURCE(IDD_EMPTY),hwndDlg,RemoteChannelListProc);
-          ShowWindow(m_child,SW_SHOWNA);
+          g_remote_channel_wnd=CreateDialog(g_hInst,MAKEINTRESOURCE(IDD_EMPTY),hwndDlg,RemoteChannelListProc);
+          ShowWindow(g_remote_channel_wnd,SW_SHOWNA);
           ShowWindow(hwndDlg,SW_SHOWNA);
         }
       }
 
       {
-        SendMessage(m_child,WM_RCUSER_UPDATE,0,0);
+        SendMessage(g_remote_channel_wnd,WM_RCUSER_UPDATE,0,0);
         RECT r;
-        GetWindowRect(m_child,&r);
+        GetWindowRect(g_remote_channel_wnd,&r);
         if (r.bottom < r.top) SWAP(r.bottom,r.top,int);
         m_h=r.bottom-r.top;
         m_w=r.right-r.left;
@@ -553,7 +563,7 @@ WDL_DLGRET RemoteOuterChannelListProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LP
       // update scrollbars and shit
     return 0;
     case WM_LCUSER_VUUPDATE:
-      SendMessage(m_child,uMsg,wParam,lParam);
+      SendMessage(g_remote_channel_wnd,uMsg,wParam,lParam);
     break;
     case WM_VSCROLL:
       {
@@ -646,11 +656,10 @@ WDL_DLGRET RemoteOuterChannelListProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LP
       return SendMessage(GetMainHwnd(),uMsg,wParam,lParam);;
     case WM_DESTROY:
       UninitializeCoolSB(hwndDlg);
-      m_child=NULL;
+      g_remote_channel_wnd=NULL;
     break;
 
   }
   return 0;
 }
-
 
